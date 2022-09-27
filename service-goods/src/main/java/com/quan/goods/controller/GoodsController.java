@@ -5,8 +5,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quan.goods.dto.GoodSkuDTO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,10 +19,22 @@ import java.util.Optional;
 
 @RequestMapping("/goods")
 @RestController
+@RefreshScope
 public class GoodsController {
 
     @Autowired
     RestTemplate restTemplate;
+
+    @Value("${env.name:}")
+    String envName;
+
+    @Value("${env.ip:}")
+    String envIP;
+
+    @GetMapping("/config")
+    public String getConfig() {
+        return "当前读取到的环境为：" + envName + "\nIP地址为：" + envIP;
+    }
 
     @GetMapping("/{skuID}")
     public GoodSkuDTO getGoodIndo(@PathVariable String skuID) throws JsonProcessingException {
