@@ -4,6 +4,8 @@ package com.quan.goods.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quan.goods.dto.GoodSkuDTO;
+import com.quan.goods.feign.StoreClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -20,6 +22,7 @@ import java.util.Optional;
 @RequestMapping("/goods")
 @RestController
 @RefreshScope
+@Slf4j
 public class GoodsController {
 
     @Autowired
@@ -30,6 +33,13 @@ public class GoodsController {
 
     @Value("${env.ip:}")
     String envIP;
+
+    @Value("${spring.application.name}")
+    String applicationName;
+
+    // 通过Feign调用服务，相当于对restTemplate进行封装
+    @Autowired
+    StoreClient storeClient;
 
     @GetMapping("/config")
     public String getConfig() {
@@ -48,20 +58,40 @@ public class GoodsController {
         goodSkuDTO.setPrice(BigDecimal.valueOf(39.90));
 
         // 从库存服务中获取store的值
-        Optional<String> optional = Optional.ofNullable(     // 可以使用之前学过的Optional来实现非空判断
-                restTemplate.getForObject("http://service-store/store/" + skuID, String.class)
-        );
-        String res = optional.orElseGet(String::new);   // 如果为空，则返回空字符串
+//        Optional<String> optional = Optional.ofNullable(     // 可以使用之前学过的Optional来实现非空判断
+//                restTemplate.getForObject("http://service-store/store/" + skuID, String.class)
+//        );
+//        String res = optional.orElseGet(String::new);   // 如果为空，则返回空字符串
+        
 
         // res是json格式，需要进行解析
-        ObjectMapper objectMapper = new ObjectMapper();
-        Map map = objectMapper.readValue(res, Map.class);
-        Long num = Long.valueOf(map.get("num").toString());
-        String port = (String) map.get("port");
+//        ObjectMapper objectMapper = new ObjectMapper();
+//        Map map = objectMapper.readValue(res, Map.class);
 
-        goodSkuDTO.setStore(num);
 
-        System.out.println("获取当前库存服务端口：" + port);
+        // 采用Feign方式远程调用服务
+        Map<String, Object> map = null;
+        log.info("请求库存服务参数：" + skuID);
+        long startTime = System.currentTimeMillis();
+
+        try {
+            map = storeClient.getStoreNum(skuID);
+        } catch (Exception e) {
+            log.error("{}请求{}，参数skuID={}出错", applicationName, "service-store", skuID);
+        }
+
+        log.info("请求返回数据：" + map);
+        log.info("请求库存服务耗时：" + (System.currentTimeMillis() - startTime) + " ms");
+
+        if (map != null) {
+            Long num = Long.valueOf(map.get("num").toString());
+            String port = (String) map.get("port");
+
+            goodSkuDTO.setStore(num);
+
+            System.out.println("获取当前库存服务端口：" + port);
+        }
+
         return goodSkuDTO;
     }
 }
